@@ -1,0 +1,24 @@
+# Python
+backend/.venv/
+__pycache__/
+*.py[cod]
+backend/db.sqlite3
+.env
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Temp bootstrap scripts
+_bootstrap*.py
+_fix_*.py
+_fe*.py
+LoginPage.tsx
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
