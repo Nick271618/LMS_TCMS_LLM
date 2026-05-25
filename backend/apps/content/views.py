@@ -86,7 +86,26 @@ class SubmitQuizView(APIView):
         correct_set = {int(x) for x in step.content.get("correct_indices", [])}
         is_correct = selected_set == correct_set
         score = step.points if is_correct else 0
-        return Response({"correct": is_correct, "score": score, "max_score": step.points})
+        submission, _ = StepSubmission.objects.update_or_create(
+            step=step,
+            user=request.user,
+            defaults={
+                "payload": {"selected": sorted(selected_set)},
+                "score": score,
+                "max_score": step.points,
+                "status": SubmissionStatus.GRADED,
+                "grading_source": GradingSource.MANUAL,
+                "graded_at": timezone.now(),
+            },
+        )
+        return Response(
+            {
+                "correct": is_correct,
+                "score": float(score),
+                "max_score": step.points,
+                "submission_id": str(submission.id),
+            }
+        )
 
 
 class StepSubmissionsListView(APIView):

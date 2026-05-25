@@ -9,6 +9,9 @@ import TeachPage from "./pages/TeachPage";
 import CourseEditPage from "./pages/CourseEditPage";
 import LessonEditPage from "./pages/LessonEditPage";
 import CourseLearnPage from "./pages/CourseLearnPage";
+import CabinetRedirectPage from "./pages/CabinetRedirectPage";
+import TeacherCabinetPage from "./pages/TeacherCabinetPage";
+import StudentCabinetPage from "./pages/StudentCabinetPage";
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -41,6 +44,16 @@ export default function App() {
             }
           >
             <Route index element={<HomePage />} />
+            <Route path="cabinet" element={<CabinetRedirectPage />} />
+            <Route
+              path="cabinet/teacher"
+              element={
+                <TeacherRoute>
+                  <TeacherCabinetPage />
+                </TeacherRoute>
+              }
+            />
+            <Route path="cabinet/student" element={<StudentCabinetPage />} />
             <Route path="learn/:courseId" element={<CourseLearnPage />} />
             <Route
               path="teach"

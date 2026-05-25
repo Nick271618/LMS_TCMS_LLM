@@ -8,7 +8,10 @@ export default function AppLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const items = [{ key: "learn", label: <Link to="/">Моё обучение</Link> }];
+  const items = [
+    { key: "learn", label: <Link to="/">Моё обучение</Link> },
+    { key: "cabinet", label: <Link to="/cabinet">Личный кабинет</Link> },
+  ];
   if (user?.role === "teacher" || user?.role === "admin") {
     items.push({ key: "teach", label: <Link to="/teach">Преподавание</Link> });
   }

@@ -1,0 +1,114 @@
+.rich-text-editor {
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.rich-text-editor__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.rich-text-editor__content {
+  min-height: 160px;
+  padding: 12px 16px;
+}
+
+.rich-text-editor__content .ProseMirror {
+  outline: none;
+  min-height: var(--editor-min-h, 136px);
+}
+
+.rich-text-editor__content .ProseMirror p {
+  margin: 0 0 0.75em;
+}
+
+.rich-text-editor__content .ProseMirror h2 {
+  font-size: 1.35em;
+  margin: 1em 0 0.5em;
+}
+
+.rich-text-editor__content .ProseMirror h3 {
+  font-size: 1.15em;
+  margin: 0.85em 0 0.45em;
+}
+
+.rich-text-editor__content .ProseMirror ul,
+.rich-text-editor__content .ProseMirror ol {
+  padding-left: 1.5em;
+  margin: 0 0 0.75em;
+}
+
+.rich-text-editor__content .ProseMirror blockquote {
+  border-left: 3px solid #d9d9d9;
+  margin: 0 0 0.75em;
+  padding-left: 1em;
+  color: #595959;
+}
+
+.rich-text-editor__content .ProseMirror pre {
+  background: #f5f5f5;
+  padding: 12px;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.rich-text-editor__content .ProseMirror img {
+  max-width: 100%;
+  height: auto;
+}
+
+.rich-text-editor__content .ProseMirror p.is-editor-empty:first-child::before {
+  color: #bfbfbf;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.rich-html-content p {
+  margin: 0 0 0.75em;
+}
+
+.rich-html-content h2 {
+  font-size: 1.35em;
+  margin: 1em 0 0.5em;
+}
+
+.rich-html-content h3 {
+  font-size: 1.15em;
+  margin: 0.85em 0 0.45em;
+}
+
+.rich-html-content ul,
+.rich-html-content ol {
+  padding-left: 1.5em;
+  margin: 0 0 0.75em;
+}
+
+.rich-html-content blockquote {
+  border-left: 3px solid #d9d9d9;
+  margin: 0 0 0.75em;
+  padding-left: 1em;
+  color: #595959;
+}
+
+.rich-html-content pre {
+  background: #f5f5f5;
+  padding: 12px;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.rich-html-content img {
+  max-width: 100%;
+  height: auto;
+}
+
+.rich-html-content a {
+  color: #1677ff;
+}

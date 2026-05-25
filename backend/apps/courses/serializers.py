@@ -1,4 +1,7 @@
 from rest_framework import serializers
+
+from apps.content.html_sanitize import sanitize_html
+
 from .models import Course, Enrollment, Lesson, Module, ModuleLesson
 
 class CourseListSerializer(serializers.ModelSerializer):
@@ -12,6 +15,9 @@ class CourseDetailSerializer(serializers.ModelSerializer):
         model = Course
         fields = ("id", "title", "short_description", "about_html", "language", "is_published", "author", "created_at", "updated_at")
         read_only_fields = ("author", "created_at", "updated_at")
+
+    def validate_about_html(self, value):
+        return sanitize_html(value or "")
 
 class ModuleSerializer(serializers.ModelSerializer):
     class Meta:

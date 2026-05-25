@@ -11,6 +11,7 @@ import {
 } from "antd";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import RichTextEditor from "../components/RichTextEditor";
 import { coursesApi, type Course, type CourseStructure } from "../api/courses";
 
 export default function CourseEditPage() {
@@ -118,8 +119,8 @@ export default function CourseEditPage() {
                   <Form.Item name="short_description" label="Краткое описание">
                     <Input.TextArea rows={3} maxLength={512} showCount />
                   </Form.Item>
-                  <Form.Item name="about_html" label="О курсе (HTML)">
-                    <Input.TextArea rows={6} placeholder="<p>Описание курса</p>" />
+                  <Form.Item name="about_html" label="О курсе">
+                    <RichTextEditor minHeight={220} />
                   </Form.Item>
                   <Button type="primary" htmlType="submit">
                     Сохранить

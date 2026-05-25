@@ -13,7 +13,14 @@ import {
 } from "antd";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import QuizStepEditor, {
+  quizContentFromValue,
+  quizValueFromContent,
+  type QuizStepValue,
+} from "../components/QuizStepEditor";
+import RichTextEditor from "../components/RichTextEditor";
 import SubmissionsGrading from "../components/SubmissionsGrading";
+import { ru } from "../i18n/ru";
 import { lessonsApi, stepsApi, type Step, type StepType } from "../api/courses";
 
 const STEP_TYPES: { value: StepType; label: string }[] = [
@@ -22,15 +29,19 @@ const STEP_TYPES: { value: StepType; label: string }[] = [
   { value: "test_case", label: "Тест-кейс" },
 ];
 
+const defaultQuizValue = (): QuizStepValue =>
+  quizValueFromContent({
+    condition_html:
+      "<p>Вы можете изменить условие задания в этом поле и указать настройки ниже.</p><p>Чему равняется 1004 разделить на 2?</p>",
+    options: ["52", "502", "520", "5002"],
+    correct_indices: [1],
+    multiple: false,
+    option_feedback: ["", "", "", ""],
+  });
+
 const defaultContent = (type: StepType): Record<string, unknown> => {
   if (type === "text") return { body_html: "<p>Теория</p>" };
-  if (type === "quiz")
-    return {
-      condition_html: "<p>Вопрос</p>",
-      options: ["Вариант 1", "Вариант 2"],
-      correct_indices: [0],
-      multiple: false,
-    };
+  if (type === "quiz") return quizContentFromValue(defaultQuizValue());
   return {
     condition_html: "<p>ТЗ: составьте тест-кейс</p>",
     rubric: "Полнота шагов, соответствие ТЗ, ожидаемый результат",
@@ -61,11 +72,15 @@ export default function LessonEditPage() {
 
   const openCreate = () => {
     setEditing(null);
+    const content = defaultContent("text");
     form.setFieldsValue({
       step_type: "text",
       title: "",
       points: 1,
-      content: defaultContent("text"),
+      body_html: (content.body_html as string) || "<p>Теория</p>",
+      condition_html: "",
+      rubric: "",
+      quiz_step: defaultQuizValue(),
     });
     setModalOpen(true);
   };
@@ -79,9 +94,10 @@ export default function LessonEditPage() {
       condition_html: step.content.condition_html || "",
       body_html: step.content.body_html || "",
       rubric: step.content.rubric || "",
-      options: (step.content.options as string[])?.join("\n") || "",
-      correct_index: (step.content.correct_indices as number[] | undefined)?.[0] ?? 0,
-      multiple: step.content.multiple ?? false,
+      quiz_step:
+        step.step_type === "quiz"
+          ? quizValueFromContent(step.content as Record<string, unknown>)
+          : defaultQuizValue(),
     });
     setModalOpen(true);
   };
@@ -89,16 +105,7 @@ export default function LessonEditPage() {
   const buildContent = (values: Record<string, unknown>, type: StepType) => {
     if (type === "text") return { body_html: values.body_html };
     if (type === "quiz") {
-      const options = String(values.options || "")
-        .split("\n")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      return {
-        condition_html: values.condition_html,
-        options,
-        correct_indices: [Number(values.correct_index)],
-        multiple: values.multiple,
-      };
+      return quizContentFromValue(values.quiz_step as QuizStepValue);
     }
     return {
       condition_html: values.condition_html,
@@ -109,6 +116,17 @@ export default function LessonEditPage() {
   const saveStep = async () => {
     const values = await form.validateFields();
     const step_type = values.step_type as StepType;
+    if (step_type === "quiz") {
+      const quiz = quizContentFromValue(values.quiz_step as QuizStepValue);
+      if (quiz.options.length < 2) {
+        message.error("Добавьте минимум два варианта ответа");
+        return;
+      }
+      if (!quiz.correct_indices.length) {
+        message.error("Отметьте хотя бы один правильный ответ");
+        return;
+      }
+    }
     const content = buildContent(values, step_type);
     const body = {
       step_type,
@@ -198,64 +216,87 @@ export default function LessonEditPage() {
         open={modalOpen}
         onCancel={() => setModalOpen(false)}
         onOk={saveStep}
-        width={640}
+        width={920}
+        styles={{ body: { maxHeight: "calc(100vh - 200px)", overflowY: "auto" } }}
         okText="Сохранить"
       >
         <Form form={form} layout="vertical">
           <Form.Item name="step_type" label="Тип" rules={[{ required: true }]}>
-            <Select options={STEP_TYPES} disabled={!!editing} />
+            <Select
+              options={STEP_TYPES}
+              disabled={!!editing}
+              onChange={(t: StepType) => {
+                if (t === "quiz" && !form.getFieldValue("quiz_step")) {
+                  form.setFieldValue("quiz_step", defaultQuizValue());
+                }
+              }}
+            />
           </Form.Item>
           <Form.Item name="title" label="Название">
             <Input />
           </Form.Item>
-          <Form.Item noStyle shouldUpdate={(p, c) => p.step_type !== c.step_type}>
-            {({ getFieldValue }) =>
-              getFieldValue("step_type") !== "text" ? (
-                <Form.Item name="points" label="Баллы">
-                  <InputNumber min={0} />
-                </Form.Item>
-              ) : null
-            }
-          </Form.Item>
           <Form.Item noStyle shouldUpdate>
             {({ getFieldValue }) => {
               const t = getFieldValue("step_type") as StepType;
+              if (t === "quiz") {
+                return (
+                  <>
+                    <Form.Item name="points" label={ru.quiz.points}>
+                      <InputNumber min={0} style={{ width: 120 }} />
+                    </Form.Item>
+                    <Form.Item
+                      name="quiz_step"
+                      rules={[
+                        {
+                          validator: async (_, val?: QuizStepValue) => {
+                            if (!val) {
+                              return Promise.reject(new Error("Укажите условие и варианты ответа"));
+                            }
+                            const q = quizContentFromValue(val);
+                            if (q.options.length < 2) {
+                              return Promise.reject(
+                                new Error("Добавьте минимум два варианта ответа"),
+                              );
+                            }
+                            if (!q.correct_indices.length) {
+                              return Promise.reject(
+                                new Error("Отметьте хотя бы один правильный ответ"),
+                              );
+                            }
+                            return Promise.resolve();
+                          },
+                        },
+                      ]}
+                    >
+                      <QuizStepEditor />
+                    </Form.Item>
+                  </>
+                );
+              }
               if (t === "text") {
                 return (
-                  <Form.Item name="body_html" label="Текст (HTML)">
-                    <Input.TextArea rows={6} />
+                  <Form.Item name="body_html" label="Текст">
+                    <RichTextEditor minHeight={480} />
                   </Form.Item>
                 );
               }
-              return (
-                <Form.Item name="condition_html" label="Условие (HTML)">
-                  <Input.TextArea rows={4} />
-                </Form.Item>
-              );
+              if (t === "test_case") {
+                return (
+                  <>
+                    <Form.Item name="points" label="Баллы">
+                      <InputNumber min={0} />
+                    </Form.Item>
+                    <Form.Item name="condition_html" label="Условие">
+                      <RichTextEditor minHeight={140} />
+                    </Form.Item>
+                    <Form.Item name="rubric" label="Рубрика для оценки (Фаза 2 — LLM)">
+                      <Input.TextArea rows={3} />
+                    </Form.Item>
+                  </>
+                );
+              }
+              return null;
             }}
-          </Form.Item>
-          <Form.Item noStyle shouldUpdate>
-            {({ getFieldValue }) =>
-              getFieldValue("step_type") === "quiz" ? (
-                <>
-                  <Form.Item name="options" label="Варианты (по одному на строку)">
-                    <Input.TextArea rows={4} />
-                  </Form.Item>
-                  <Form.Item name="correct_index" label="Индекс правильного (с 0)">
-                    <InputNumber min={0} />
-                  </Form.Item>
-                </>
-              ) : null
-            }
-          </Form.Item>
-          <Form.Item noStyle shouldUpdate>
-            {({ getFieldValue }) =>
-              getFieldValue("step_type") === "test_case" ? (
-                <Form.Item name="rubric" label="Рубрика для оценки (Фаза 2 — LLM)">
-                  <Input.TextArea rows={3} />
-                </Form.Item>
-              ) : null
-            }
           </Form.Item>
         </Form>
       </Modal>

@@ -1,6 +1,8 @@
-import { Alert, Button, Card, Checkbox, Radio, Space, message } from "antd";
-import { useEffect, useState } from "react";
+import { Alert, Button, Card, Checkbox, Radio, Space, Typography, message } from "antd";
+import { useEffect, useMemo, useState } from "react";
 import { stepsApi, type Step } from "../api/courses";
+import { feedbackIndicesToShow } from "../lib/quizFeedback";
+import RichHtmlViewer from "./RichHtmlViewer";
 import TestCaseForm from "./TestCaseForm";
 
 type Props = { step: Step };
@@ -18,6 +20,20 @@ export default function StepPlayer({ step }: Props) {
   const bodyHtml = String(step.content.body_html || "");
   const options = (step.content.options as string[]) || [];
   const multiple = Boolean(step.content.multiple);
+  const correctIndices = (step.content.correct_indices as number[]) || [];
+  const optionFeedback = (step.content.option_feedback as string[]) || [];
+
+  const feedbackBlocks = useMemo(() => {
+    if (!quizResult || quizResult.correct) return [];
+    const indices = feedbackIndicesToShow(selected, correctIndices);
+    return indices
+      .map((i) => ({
+        index: i,
+        label: options[i] ?? `Вариант ${i + 1}`,
+        text: optionFeedback[i]?.trim() ?? "",
+      }))
+      .filter((b) => b.text);
+  }, [quizResult, selected, correctIndices, options, optionFeedback]);
 
   const submitQuiz = async () => {
     try {
@@ -32,7 +48,7 @@ export default function StepPlayer({ step }: Props) {
   if (step.step_type === "text") {
     return (
       <Card title={step.title || "Теория"}>
-        <div dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+        <RichHtmlViewer html={bodyHtml} />
       </Card>
     );
   }
@@ -40,7 +56,7 @@ export default function StepPlayer({ step }: Props) {
   if (step.step_type === "quiz") {
     return (
       <Card title={step.title || "Тест"}>
-        {conditionHtml && <div dangerouslySetInnerHTML={{ __html: conditionHtml }} />}
+        {conditionHtml && <RichHtmlViewer html={conditionHtml} />}
         <Space direction="vertical" style={{ width: "100%", marginTop: 16 }}>
           {multiple ? (
             <Checkbox.Group
@@ -66,6 +82,20 @@ export default function StepPlayer({ step }: Props) {
                   ? `Верно! Баллы: ${quizResult.score}`
                   : "Неверный ответ"
               }
+              description={
+                !quizResult.correct && feedbackBlocks.length > 0 ? (
+                  <Space direction="vertical" size="small" style={{ width: "100%" }}>
+                    {feedbackBlocks.map((b) => (
+                      <div key={b.index}>
+                        <Typography.Text strong>{b.label}</Typography.Text>
+                        <div style={{ marginTop: 4 }}>
+                          <RichHtmlViewer html={b.text} />
+                        </div>
+                      </div>
+                    ))}
+                  </Space>
+                ) : undefined
+              }
             />
           )}
         </Space>
@@ -78,7 +108,7 @@ export default function StepPlayer({ step }: Props) {
       <Space direction="vertical" style={{ width: "100%" }} size="large">
         {conditionHtml && (
           <Card title="Условие">
-            <div dangerouslySetInnerHTML={{ __html: conditionHtml }} />
+            <RichHtmlViewer html={conditionHtml} />
           </Card>
         )}
         <TestCaseForm stepId={step.id} />

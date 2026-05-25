@@ -1,5 +1,6 @@
 from decimal import Decimal
 from rest_framework import serializers
+from .html_sanitize import sanitize_step_content
 from .models import GradingSource, Step, StepSubmission, StepType, SubmissionStatus
 
 class StepSerializer(serializers.ModelSerializer):
@@ -7,6 +8,9 @@ class StepSerializer(serializers.ModelSerializer):
         model = Step
         fields = ("id", "lesson", "order", "step_type", "title", "points", "content")
         read_only_fields = ("lesson",)
+
+    def validate_content(self, value):
+        return sanitize_step_content(value)
 
 class TestCasePayloadSerializer(serializers.Serializer):
     test_case_id = serializers.CharField(max_length=32)
