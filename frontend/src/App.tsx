@@ -8,6 +8,7 @@ import RegisterPage from "./pages/RegisterPage";
 import TeachPage from "./pages/TeachPage";
 import CourseEditPage from "./pages/CourseEditPage";
 import LessonEditPage from "./pages/LessonEditPage";
+import StepDraftPreviewPage from "./pages/StepDraftPreviewPage";
 import CourseLearnPage from "./pages/CourseLearnPage";
 import CabinetRedirectPage from "./pages/CabinetRedirectPage";
 import TeacherCabinetPage from "./pages/TeacherCabinetPage";
@@ -76,6 +77,14 @@ export default function App() {
               element={
                 <TeacherRoute>
                   <LessonEditPage />
+                </TeacherRoute>
+              }
+            />
+            <Route
+              path="teach/preview/draft/:token"
+              element={
+                <TeacherRoute>
+                  <StepDraftPreviewPage />
                 </TeacherRoute>
               }
             />

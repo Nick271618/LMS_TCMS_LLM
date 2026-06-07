@@ -22,13 +22,28 @@ export default function RegisterPage() {
   }) => {
     try {
       await authApi.register(values);
-      await authApi.login(values.email, values.password);
+      try {
+        await authApi.login(values.email, values.password);
+      } catch {
+        message.warning("Аккаунт создан. Войдите на странице «Вход».");
+        navigate("/login");
+        return;
+      }
       const user = authApi.storedUser();
       if (user) setUser(user);
       message.success("Регистрация успешна");
       navigate("/");
-    } catch {
-      message.error("Ошибка регистрации");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      if (msg.includes("[500]") || msg.includes("[502]") || msg.includes("Failed to fetch")) {
+        message.error(
+          "Сервер недоступен. Запустите PostgreSQL, затем в папке backend: python manage.py runserver",
+        );
+      } else if (msg.toLowerCase().includes("email") || msg.includes("уже")) {
+        message.error("Этот email уже зарегистрирован — войдите или укажите другой");
+      } else {
+        message.error(msg || "Ошибка регистрации");
+      }
     }
   };
 

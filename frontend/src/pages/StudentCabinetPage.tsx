@@ -149,12 +149,17 @@ export default function StudentCabinetPage() {
                         r.score !== null ? `${r.score} / ${r.max_score}` : "—",
                     },
                     {
-                      title: "Статус",
-                      dataIndex: "status",
-                      render: (s) => (
-                        <Tag color={s === "graded" ? "green" : s === "submitted" ? "gold" : "default"}>
-                          {s === "graded" ? "Оценено" : s === "submitted" ? "Ожидает" : s}
-                        </Tag>
+                      title: "Оценка",
+                      render: (_, r) => (
+                        <>
+                          <Tag color={r.status === "graded" ? "green" : r.status === "submitted" ? "gold" : "default"}>
+                            {r.status === "graded" ? "Оценено" : r.status === "submitted" ? "Ожидает" : r.status}
+                          </Tag>
+                          {r.grading_source === "llm" && <Tag color="blue">ИИ</Tag>}
+                          {r.grading_source === "manual" && r.status === "graded" && (
+                            <Tag>Преподаватель</Tag>
+                          )}
+                        </>
                       ),
                     },
                     {

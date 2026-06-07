@@ -1,0 +1,18 @@
+.match-step-editor__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.match-step-editor__row .ant-input {
+  flex: 1;
+}
+
+.match-step-editor__bridge {
+  width: 24px;
+  height: 8px;
+  background: #d9d9d9;
+  border-radius: 2px;
+  flex-shrink: 0;
+}

@@ -1,103 +1,208 @@
-import { Alert, Button, Form, Input, Select, Typography, message } from "antd";
+import {
+  Alert,
+  Button,
+  Collapse,
+  Form,
+  Input,
+  Progress,
+  Space,
+  Tag,
+  Typography,
+  message,
+} from "antd";
 import { useEffect, useState } from "react";
 import { stepsApi, type StepSubmission } from "../api/courses";
+import { ru } from "../i18n/ru";
+import type { LlmGrade } from "../lib/testCaseRubric";
 
-const PRIORITY = [
-  { value: "low", label: "Низкий" },
-  { value: "medium", label: "Средний" },
-  { value: "high", label: "Высокий" },
-  { value: "critical", label: "Критический" },
-];
-const TESTING = [
-  { value: "functional", label: "Функциональное" },
-  { value: "integration", label: "Интеграционное" },
-  { value: "regression", label: "Регрессионное" },
-  { value: "smoke", label: "Smoke" },
-  { value: "acceptance", label: "Приёмочное" },
-  { value: "negative", label: "Негативное" },
-];
+type Props = {
+  stepId: string;
+  submit?: (stepId: string, values: Record<string, string>) => Promise<StepSubmission>;
+};
 
-type Props = { stepId: string };
+const criterionLabels: Record<string, string> = ru.testCase.criterionLabels;
 
-export default function TestCaseForm({ stepId }: Props) {
+function getLlmGrade(payload: Record<string, unknown> | undefined): LlmGrade | null {
+  const g = payload?.llm_grade;
+  if (!g || typeof g !== "object") return null;
+  return g as LlmGrade;
+}
+
+function LlmResultView({
+  submission,
+  onResubmit,
+}: {
+  submission: StepSubmission;
+  onResubmit: () => void;
+}) {
+  const llm = getLlmGrade(submission.payload as Record<string, unknown>);
+  const isLlm = submission.grading_source === "llm";
+
+  return (
+    <Space direction="vertical" style={{ width: "100%" }} size="middle">
+      <Alert
+        type={isLlm ? "success" : "info"}
+        message={`${ru.testCase.scoreLabel}: ${submission.score} / ${submission.max_score}`}
+        description={
+          llm?.summary || submission.feedback || (isLlm ? "" : ru.testCase.waitingTeacher)
+        }
+      />
+      {llm?.total_percent != null && (
+        <div>
+          <Typography.Text type="secondary">{ru.testCase.totalPercent}</Typography.Text>
+          <Progress percent={Math.round(llm.total_percent)} />
+        </div>
+      )}
+      {llm?.recommendations?.length ? (
+        <div>
+          <Typography.Title level={5}>{ru.testCase.recommendations}</Typography.Title>
+          <ul style={{ margin: 0, paddingLeft: 20 }}>
+            {llm.recommendations.map((r, i) => (
+              <li key={i}>
+                <Typography.Text>{r}</Typography.Text>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {llm?.criteria?.length ? (
+        <Collapse
+          items={[
+            {
+              key: "criteria",
+              label: ru.testCase.criteriaDetails,
+              children: (
+                <Space direction="vertical" style={{ width: "100%" }}>
+                  {llm.criteria.map((c) => (
+                    <div key={c.id}>
+                      <Space>
+                        <Typography.Text strong>
+                          {criterionLabels[c.id] ?? c.id}
+                        </Typography.Text>
+                        <Tag>{c.percent}%</Tag>
+                      </Space>
+                      <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
+                        {c.comment}
+                      </Typography.Paragraph>
+                    </div>
+                  ))}
+                </Space>
+              ),
+            },
+          ]}
+        />
+      ) : null}
+      {submission.grading_source === "manual" && (
+        <Typography.Text type="secondary">{ru.testCase.teacherOverride}</Typography.Text>
+      )}
+      <Button type="primary" onClick={onResubmit}>
+        {ru.testCase.resubmit}
+      </Button>
+    </Space>
+  );
+}
+
+export default function TestCaseForm({ stepId, submit }: Props) {
   const [loading, setLoading] = useState(false);
   const [submission, setSubmission] = useState<StepSubmission | null>(null);
+  const [showForm, setShowForm] = useState(true);
   const [form] = Form.useForm();
 
-  useEffect(() => {
+  const loadSubmission = () => {
     stepsApi
       .mySubmission(stepId)
       .then((s) => {
         setSubmission(s);
-        form.setFieldsValue(s.payload);
+        const p = s.payload as Record<string, string>;
+        form.setFieldsValue({
+          title: p.title ?? "",
+          preconditions: p.preconditions ?? "",
+          execution_steps: p.execution_steps ?? "",
+          expected_result: p.expected_result ?? "",
+        });
+        setShowForm(s.status !== "graded" && s.status !== "submitted");
       })
-      .catch(() => setSubmission(null));
-  }, [stepId, form]);
+      .catch(() => {
+        setSubmission(null);
+        setShowForm(true);
+      });
+  };
+
+  useEffect(() => {
+    loadSubmission();
+  }, [stepId]);
 
   const onFinish = async (values: Record<string, string>) => {
     setLoading(true);
     try {
-      const s = await stepsApi.submitTestCase(stepId, values);
+      const submitFn = submit ?? stepsApi.submitTestCase;
+      const s = await submitFn(stepId, values);
       setSubmission(s);
-      message.success("Отправлено на оценку");
+      setShowForm(false);
+      if (s.status === "graded" && s.grading_source === "llm") {
+        message.success(ru.testCase.gradedByAi);
+      } else if (s.status === "submitted") {
+        message.warning(ru.testCase.aiUnavailable);
+      } else {
+        message.success(ru.testCase.submitted);
+      }
     } catch {
-      message.error("Не удалось отправить");
+      message.error(ru.testCase.submitError);
     } finally {
       setLoading(false);
     }
   };
 
-  if (submission?.status === "graded") {
+  if (submission?.status === "graded" && !showForm) {
     return (
-      <Alert
-        type="success"
-        message={`Оценено: ${submission.score} / ${submission.max_score}`}
-        description={submission.feedback || "Комментарий преподавателя"}
-      />
+      <LlmResultView submission={submission} onResubmit={() => setShowForm(true)} />
     );
   }
 
-  if (submission?.status === "submitted") {
+  if (submission?.status === "submitted" && !showForm) {
+    const err = (submission.payload as Record<string, unknown>)?.llm_error;
     return (
-      <Alert
-        type="info"
-        message="Ожидает проверки преподавателем"
-        description="Автопроверка ИИ будет подключена на Фазе 2."
-      />
+      <Space direction="vertical" style={{ width: "100%" }}>
+        <Alert
+          type="warning"
+          message={ru.testCase.aiUnavailable}
+          description={err ? String(err) : ru.testCase.waitingTeacher}
+        />
+        <Button onClick={() => setShowForm(true)}>{ru.testCase.resubmit}</Button>
+      </Space>
     );
   }
 
   return (
     <Form form={form} layout="vertical" onFinish={onFinish}>
-      <Form.Item label="ID тест-кейса" name="test_case_id" rules={[{ required: true }]}>
-        <Input placeholder="TC-001" />
+      {loading && (
+        <Alert type="info" message={ru.testCase.aiChecking} showIcon style={{ marginBottom: 16 }} />
+      )}
+      <Form.Item label={ru.testCase.fieldTitle} name="title" rules={[{ required: true }]}>
+        <Input placeholder={ru.testCase.fieldTitleHint} />
       </Form.Item>
-      <Form.Item label="Название тест-кейса" name="title" rules={[{ required: true }]}>
-        <Input placeholder="Краткое и понятное название" />
+      <Form.Item label={ru.testCase.fieldPreconditions} name="preconditions">
+        <Input.TextArea rows={2} placeholder={ru.testCase.fieldPreconditionsHint} />
       </Form.Item>
-      <Form.Item label="Описание" name="description" rules={[{ required: true }]}>
-        <Input.TextArea rows={3} placeholder="Подробное описание того, что тестируется" />
+      <Form.Item
+        label={ru.testCase.fieldSteps}
+        name="execution_steps"
+        rules={[{ required: true }]}
+      >
+        <Input.TextArea rows={4} placeholder={ru.testCase.fieldStepsHint} />
       </Form.Item>
-      <Form.Item label="Предусловия" name="preconditions">
-        <Input.TextArea rows={2} placeholder="Условия перед тестом" />
-      </Form.Item>
-      <Form.Item label="Шаги выполнения" name="execution_steps" rules={[{ required: true }]}>
-        <Input.TextArea rows={4} placeholder={"1. Шаг первый\n2. Шаг второй"} />
-      </Form.Item>
-      <Form.Item label="Ожидаемый результат" name="expected_result" rules={[{ required: true }]}>
+      <Form.Item
+        label={ru.testCase.fieldExpected}
+        name="expected_result"
+        rules={[{ required: true }]}
+      >
         <Input.TextArea rows={2} />
       </Form.Item>
-      <Form.Item label="Приоритет" name="priority" rules={[{ required: true }]}>
-        <Select options={PRIORITY} placeholder="Выберите приоритет" />
-      </Form.Item>
-      <Form.Item label="Тип тестирования" name="testing_type" rules={[{ required: true }]}>
-        <Select options={TESTING} placeholder="Выберите тип" />
-      </Form.Item>
       <Button type="primary" htmlType="submit" loading={loading} block size="large">
-        Отправить на оценку
+        {submission ? ru.testCase.resubmit : ru.testCase.submit}
       </Button>
       <Typography.Paragraph type="secondary" style={{ marginTop: 8 }}>
-        Фаза 1: проверка преподавателем вручную.
+        {ru.testCase.submitHint}
       </Typography.Paragraph>
     </Form>
   );

@@ -16,14 +16,22 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   const res = await fetch(`${API_URL}${path}`, { ...options, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    const detail =
-      typeof err === "object" && err !== null
-        ? (err as { detail?: string }).detail ||
-          Object.entries(err as Record<string, unknown>)
-            .map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
-            .join("; ")
-        : res.statusText;
-    throw new Error(detail || res.statusText);
+    let detail = res.statusText;
+    if (typeof err === "object" && err !== null) {
+      const o = err as Record<string, unknown>;
+      if (typeof o.detail === "string") detail = o.detail;
+      else if (Array.isArray(o.detail)) detail = o.detail.map(String).join(" ");
+      else {
+        detail = Object.entries(o)
+          .map(([k, v]) => {
+            const text = Array.isArray(v) ? v.map(String).join(", ") : String(v);
+            return `${k}: ${text}`;
+          })
+          .join("; ");
+      }
+    }
+    const prefix = res.status >= 500 ? `[${res.status}] ` : "";
+    throw new Error(prefix + (detail || res.statusText));
   }
   if (res.status === 204) return undefined as T;
   return res.json();

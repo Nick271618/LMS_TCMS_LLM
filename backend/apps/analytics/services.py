@@ -149,7 +149,7 @@ def teacher_summary(user, course: Course | None) -> dict:
     )
     quiz_count = StepSubmission.objects.filter(
         step__lesson__module_placements__module__course_id__in=course_ids,
-        step__step_type="quiz",
+        step__step_type__in=("quiz", "match"),
     ).count()
 
     total_score = Decimal("0")
@@ -237,7 +237,13 @@ def _submission_brief(sub: StepSubmission, courses: list[Course]) -> dict:
                     lesson_title = c["lesson_title"]
                     break
             break
-    llm = sub.payload.get("llm_score") if isinstance(sub.payload, dict) else None
+    llm = None
+    if isinstance(sub.payload, dict):
+        grade = sub.payload.get("llm_grade")
+        if isinstance(grade, dict):
+            llm = grade.get("total_percent")
+        else:
+            llm = sub.payload.get("llm_score")
     return {
         "id": str(sub.id),
         "user_name": sub.user.name,

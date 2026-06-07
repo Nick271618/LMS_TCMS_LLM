@@ -74,6 +74,12 @@ export type SubmissionDetail = {
   course_title: string;
   llm_score?: number | null;
   llm_feedback?: string;
+  llm_grade?: {
+    total_percent: number;
+    criteria: { id: string; percent: number; comment: string }[];
+    summary: string;
+    recommendations: string[];
+  };
 };
 
 export type TeacherSummary = {

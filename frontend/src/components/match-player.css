@@ -1,0 +1,12 @@
+.match-player__row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.match-player__left {
+  min-width: 120px;
+  max-width: 40%;
+  flex-shrink: 0;
+}

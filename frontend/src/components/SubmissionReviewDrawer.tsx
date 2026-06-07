@@ -1,7 +1,22 @@
-import { Button, Card, Descriptions, Drawer, Form, Input, InputNumber, Space, Tag, Typography, message } from "antd";
+import {
+  Button,
+  Card,
+  Collapse,
+  Descriptions,
+  Drawer,
+  Form,
+  Input,
+  InputNumber,
+  Space,
+  Tag,
+  Typography,
+  message,
+} from "antd";
 import { useEffect, useState } from "react";
 import { cabinetApi, type SubmissionDetail } from "../api/cabinet";
 import { stepsApi } from "../api/courses";
+import { ru } from "../i18n/ru";
+import type { LlmGrade } from "../lib/testCaseRubric";
 import RichHtmlViewer from "./RichHtmlViewer";
 
 type Props = {
@@ -12,16 +27,43 @@ type Props = {
   onGraded?: () => void;
 };
 
+function MatchSubmissionView({
+  payload,
+  pairs,
+}: {
+  payload: Record<string, unknown>;
+  pairs: { left: string; right: string }[];
+}) {
+  const mapping = (payload.mapping as number[]) ?? [];
+  return (
+    <Descriptions column={1} size="small" bordered>
+      {pairs.map((p, i) => {
+        const chosen = mapping[i];
+        const chosenRight = chosen !== undefined ? pairs[chosen]?.right : "—";
+        const ok = chosen === i;
+        return (
+          <Descriptions.Item
+            key={i}
+            label={
+              <>
+                {p.left} {ok ? "✓" : "✗"}
+              </>
+            }
+          >
+            {chosenRight} {ok ? "" : `(верно: ${p.right})`}
+          </Descriptions.Item>
+        );
+      })}
+    </Descriptions>
+  );
+}
+
 function TestCasePayloadView({ payload }: { payload: Record<string, unknown> }) {
   const fields: [string, string][] = [
-    ["ID", "test_case_id"],
     ["Название", "title"],
-    ["Описание", "description"],
     ["Предусловия", "preconditions"],
     ["Шаги", "execution_steps"],
     ["Ожидаемый результат", "expected_result"],
-    ["Приоритет", "priority"],
-    ["Тип тестирования", "testing_type"],
   ];
   return (
     <Descriptions column={1} size="small" bordered>
@@ -31,6 +73,66 @@ function TestCasePayloadView({ payload }: { payload: Record<string, unknown> }) 
         </Descriptions.Item>
       ))}
     </Descriptions>
+  );
+}
+
+function FreeAnswerPayloadView({ payload }: { payload: Record<string, unknown> }) {
+  const answer = String(payload.answer ?? "").trim();
+  return (
+    <Descriptions column={1} size="small" bordered>
+      <Descriptions.Item label={ru.freeAnswer.answerLabel}>
+        {answer || "—"}
+      </Descriptions.Item>
+    </Descriptions>
+  );
+}
+
+function LlmGradeBlock({ llm }: { llm: LlmGrade }) {
+  const labels = { ...ru.testCase.criterionLabels, ...ru.freeAnswer.criterionLabels } as Record<
+    string,
+    string
+  >;
+  return (
+    <Space direction="vertical" style={{ width: "100%" }}>
+      {llm.total_percent != null && (
+        <Typography.Paragraph>
+          {ru.testCase.totalPercent}: {Math.round(llm.total_percent)}%
+        </Typography.Paragraph>
+      )}
+      {"band_min_percent" in llm &&
+        llm.band_min_percent != null &&
+        llm.awarded_points != null && (
+          <Typography.Paragraph type="secondary">
+            {ru.freeAnswer.scoreBandApplied
+              .replace("{percent}", String(llm.band_min_percent))
+              .replace("{points}", String(llm.awarded_points))}
+          </Typography.Paragraph>
+        )}
+      {llm.summary && <Typography.Paragraph>{llm.summary}</Typography.Paragraph>}
+      {llm.recommendations?.length ? (
+        <ul style={{ margin: 0, paddingLeft: 20 }}>
+          {llm.recommendations.map((r, i) => (
+            <li key={i}>{r}</li>
+          ))}
+        </ul>
+      ) : null}
+      {llm.criteria?.length ? (
+        <Collapse
+          size="small"
+          items={[
+            {
+              key: "c",
+              label: ru.testCase.criteriaDetails,
+              children: llm.criteria.map((c) => (
+                <div key={c.id} style={{ marginBottom: 8 }}>
+                  <Tag>{labels[c.id as keyof typeof labels] ?? c.id}</Tag> {c.percent}% — {c.comment}
+                </div>
+              )),
+            },
+          ]}
+        />
+      ) : null}
+    </Space>
   );
 }
 
@@ -77,8 +179,24 @@ export default function SubmissionReviewDrawer({
     }
   };
 
-  const llmScore = detail?.llm_score ?? detail?.payload?.llm_score;
-  const llmFeedback = detail?.llm_feedback ?? detail?.payload?.llm_feedback;
+  const acceptAiGrade = async () => {
+    if (!submissionId || !detail?.score) return;
+    try {
+      await stepsApi.grade(submissionId, {
+        score: Number(detail.score),
+        feedback: detail.feedback || "",
+      });
+      message.success("Оценка ИИ принята");
+      onGraded?.();
+      onClose();
+    } catch {
+      message.error("Ошибка сохранения");
+    }
+  };
+
+  const payload = (detail?.payload ?? {}) as Record<string, unknown>;
+  const llmGrade = (detail?.llm_grade ?? payload.llm_grade) as LlmGrade | undefined;
+  const llmError = payload.llm_error as string | undefined;
 
   return (
     <Drawer
@@ -97,6 +215,7 @@ export default function SubmissionReviewDrawer({
             <div>
               <Tag>{detail.step_type}</Tag>
               <Tag color={detail.status === "graded" ? "green" : "gold"}>{detail.status}</Tag>
+              {detail.grading_source === "llm" && <Tag color="blue">ИИ</Tag>}
             </div>
           </div>
 
@@ -105,32 +224,47 @@ export default function SubmissionReviewDrawer({
               <RichHtmlViewer html={String(detail.step_content.condition_html)} />
             </Card>
           ) : null}
+          {detail.step_type === "ui_practice" && detail.step_content?.task_html ? (
+            <Card size="small" title={ru.uiPractice.objectTitle}>
+              <RichHtmlViewer html={String(detail.step_content.task_html)} />
+            </Card>
+          ) : null}
 
           <Card size="small" title="Сдача студента">
-            {detail.step_type === "test_case" ? (
+            {detail.step_type === "test_case" || detail.step_type === "ui_practice" ? (
               <TestCasePayloadView payload={detail.payload} />
             ) : detail.step_type === "quiz" ? (
               <Typography.Text>
                 Выбранные варианты:{" "}
                 {JSON.stringify((detail.payload as { selected?: number[] }).selected ?? [])}
               </Typography.Text>
+            ) : detail.step_type === "match" ? (
+              <MatchSubmissionView
+                payload={detail.payload}
+                pairs={
+                  (detail.step_content?.pairs as { left: string; right: string }[]) ?? []
+                }
+              />
+            ) : detail.step_type === "free_answer" ? (
+              <FreeAnswerPayloadView payload={detail.payload} />
             ) : (
               <pre style={{ fontSize: 12 }}>{JSON.stringify(detail.payload, null, 2)}</pre>
             )}
           </Card>
 
           <Card size="small" title="Оценка ИИ">
-            {llmScore != null || llmFeedback ? (
-              <>
-                {llmScore != null && (
-                  <Typography.Paragraph>Баллы (ИИ): {String(llmScore)}</Typography.Paragraph>
-                )}
-                {llmFeedback && <Typography.Paragraph>{String(llmFeedback)}</Typography.Paragraph>}
-              </>
+            {llmGrade ? (
+              <LlmGradeBlock llm={llmGrade} />
+            ) : llmError ? (
+              <Typography.Text type="warning">{llmError}</Typography.Text>
             ) : (
-              <Typography.Text type="secondary">ИИ не подключён (фаза 2)</Typography.Text>
+              <Typography.Text type="secondary">{ru.cabinet.aiNotConnected}</Typography.Text>
             )}
           </Card>
+
+          {canGrade && detail.grading_source === "llm" && detail.status === "graded" && (
+            <Button onClick={acceptAiGrade}>{ru.testCase.acceptAiGrade}</Button>
+          )}
 
           {canGrade && detail.status === "submitted" && (
             <Card size="small" title="Итоговая оценка преподавателя">
@@ -148,7 +282,23 @@ export default function SubmissionReviewDrawer({
             </Card>
           )}
 
-          {detail.status === "graded" && (
+          {canGrade && detail.status === "graded" && detail.grading_source === "llm" && (
+            <Card size="small" title="Изменить оценку">
+              <Form form={form} layout="vertical">
+                <Form.Item name="score" label="Баллы" rules={[{ required: true }]}>
+                  <InputNumber min={0} max={Number(detail.max_score) || undefined} style={{ width: "100%" }} />
+                </Form.Item>
+                <Form.Item name="feedback" label="Комментарий">
+                  <Input.TextArea rows={3} />
+                </Form.Item>
+                <Button type="primary" onClick={submitGrade}>
+                  Сохранить
+                </Button>
+              </Form>
+            </Card>
+          )}
+
+          {detail.status === "graded" && !canGrade && (
             <Card size="small" title="Оценка">
               <Typography.Paragraph>
                 {detail.score} / {detail.max_score}

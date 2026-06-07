@@ -112,3 +112,15 @@
 .rich-html-content a {
   color: #1677ff;
 }
+
+.rich-html-viewer {
+  position: relative;
+}
+
+.rich-html-viewer__save {
+  position: sticky;
+  bottom: 8px;
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 8px;
+}

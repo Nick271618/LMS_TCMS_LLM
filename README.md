@@ -1,11 +1,12 @@
 # LMS TCMS LLM
 
-Stepik-подобная LMS для обучения тестированию. **Фаза 1** — без LLM (курсы, auth, шаг «Тест-кейс» с ручной проверкой).
+Stepik-подобная LMS для обучения тестированию. **Фаза 2** — автопроверка тест-кейсов локальной LLM (Ollama), личные кабинеты, рубрика по критериям.
 
 ## Стек
 
 - **Backend:** Django 6 + DRF + JWT (SimpleJWT)
 - **Frontend:** React + TypeScript + Vite 5 + Ant Design
+- **LLM:** Ollama (`qwen2.5:7b-instruct-q4_K_M` по умолчанию)
 - **БД:** SQLite (если нет `.env`) или **PostgreSQL** (рекомендуется с pgAdmin)
 
 ## База данных (PostgreSQL + pgAdmin)
@@ -69,6 +70,26 @@ POSTGRES_PASSWORD=lms
 
 Если уже есть данные в `db.sqlite3`, для диплома проще начать с чистой БД Postgres (`migrate`). Перенос — отдельная задача (`dumpdata` / `loaddata`).
 
+## Ollama (автопроверка тест-кейсов)
+
+```powershell
+ollama pull qwen2.5:7b-instruct-q4_K_M
+ollama serve
+```
+
+В `backend/.env` (из `.env.example`):
+
+```env
+OLLAMA_ENABLED=true
+OLLAMA_HOST=http://127.0.0.1:11434
+OLLAMA_MODEL=qwen2.5:7b-instruct-q4_K_M
+OLLAMA_TEMPERATURE=0
+OLLAMA_NUM_CTX=4096
+OLLAMA_TIMEOUT=120
+```
+
+Отключить ИИ без удаления кода: `OLLAMA_ENABLED=false` — сдачи останутся в статусе `submitted` для ручной проверки.
+
 ## Быстрый старт
 
 ### Backend
@@ -76,7 +97,7 @@ POSTGRES_PASSWORD=lms
 ```powershell
 cd backend
 .\.venv\Scripts\pip install -r requirements.txt
-# Настройте .env для Postgres (см. выше) или пропустите — будет SQLite
+# Настройте .env для Postgres и Ollama (см. выше) или пропустите — будет SQLite
 .\.venv\Scripts\python manage.py migrate
 .\.venv\Scripts\python manage.py runserver
 ```
@@ -102,20 +123,25 @@ UI: http://localhost:5173 (прокси `/api` → backend)
 | GET | `/api/auth/me/` | Bearer token |
 | POST | `/api/auth/refresh/` | `refresh` |
 
-## Тест-кейс (без LLM)
+## Тест-кейс и LLM
 
-- POST `/api/steps/<uuid>/submit-test-case/` — сдача (8 полей по шаблону)
-- POST `/api/submissions/<uuid>/grade/` — оценка преподавателем (`score`, `feedback`)
+| Метод | URL | Описание |
+|-------|-----|----------|
+| POST | `/api/steps/<uuid>/submit-test-case/` | Сдача: `title`, `preconditions`, `execution_steps`, `expected_result` → синхронная оценка Ollama |
+| GET | `/api/steps/<uuid>/my-submission/` | Последняя сдача студента (без `llm_debug`) |
+| POST | `/api/submissions/<uuid>/grade/` | Оценка / принятие ИИ преподавателем (`score`, `feedback`) → `grading_source=manual` |
 
-**Фаза 2 (позже):** Ollama, автопроверка LLM, чат-тьютор.
+После успешной оценки ИИ: `status=graded`, `grading_source=llm`, в `payload.llm_grade` — проценты по критериям и рекомендации.
 
-## UI (Фаза 1)
+## UI
 
-- **Преподавание:** список курсов → редактор курса (описание, модули, уроки) → редактор урока (шаги: текст, тест, тест-кейс)
-- **Оценка тест-кейсов:** в редакторе урока → «Работы» на шаге типа тест-кейс
-- **Обучение:** каталог / мои курсы → прохождение урока (текст, тест, форма тест-кейса)
+- **Преподавание:** курс → урок → шаг «Тест-кейс»: ТЗ (`condition_html`), рубрика (критерии + веса + hints), опционально эталон
+- **Студент:** форма из 4 полей → результат ИИ → «Улучшить и отправить снова»
+- **Кабинеты:** `/cabinet/teacher`, `/cabinet/student` — табель, очередь, просмотр сдачи, метка «ИИ»
 
 ## Документация
 
 - [Описание.md](Описание.md)
 - [Регистрация,авторизация.md](Регистрация,авторизация.md)
+- [docs/VKR_LLM.md](docs/VKR_LLM.md) — критерии, методика, риски, эксперимент для ВКР
+- [docs/student-assignments/](docs/student-assignments/) — **ТЗ для студентов** и **эталонные тест-кейсы** (3 задания)

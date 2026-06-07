@@ -1,4 +1,4 @@
-import { Button, List, Modal, Typography, message } from "antd";
+import { Button, List, Modal, Tag, Typography, message } from "antd";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { stepsApi, type StepSubmission } from "../api/courses";
@@ -39,7 +39,15 @@ export default function SubmissionsGrading({ stepId, open, onClose }: Props) {
                 title={`${s.user_name} (${s.user_email})`}
                 description={
                   <>
-                    <Typography.Text type="secondary">Статус: {s.status}</Typography.Text>
+                    <Typography.Text type="secondary">
+                      Статус: {s.status}
+                      {s.grading_source === "llm" && (
+                        <>
+                          {" "}
+                          <Tag color="blue">ИИ</Tag>
+                        </>
+                      )}
+                    </Typography.Text>
                     {s.status === "graded" && (
                       <div>
                         Баллы: {s.score}/{s.max_score}

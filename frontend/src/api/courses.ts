@@ -28,7 +28,7 @@ export type Lesson = {
   comments_disabled: boolean;
 };
 
-export type StepType = "text" | "video" | "quiz" | "test_case" | "sort" | "match";
+export type StepType = "text" | "video" | "quiz" | "test_case" | "sort" | "match" | "free_answer" | "ui_practice";
 
 export type Step = {
   id: string;
@@ -93,10 +93,25 @@ export const stepsApi = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  submitUiPractice: (stepId: string, payload: Record<string, string>) =>
+    api<StepSubmission>(`/steps/${stepId}/submit-ui-practice/`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   submitQuiz: (stepId: string, selected: number[]) =>
     api<{ correct: boolean; score: number; max_score: number }>(`/steps/${stepId}/submit-quiz/`, {
       method: "POST",
       body: JSON.stringify({ selected }),
+    }),
+  submitMatch: (stepId: string, mapping: number[]) =>
+    api<{ correct: boolean; score: number; max_score: number }>(`/steps/${stepId}/submit-match/`, {
+      method: "POST",
+      body: JSON.stringify({ mapping }),
+    }),
+  submitFreeAnswer: (stepId: string, answer: string) =>
+    api<StepSubmission>(`/steps/${stepId}/submit-free-answer/`, {
+      method: "POST",
+      body: JSON.stringify({ answer }),
     }),
   mySubmission: (stepId: string) => api<StepSubmission>(`/steps/${stepId}/my-submission/`),
   listSubmissions: (stepId: string) => api<StepSubmission[]>(`/steps/${stepId}/submissions/`),

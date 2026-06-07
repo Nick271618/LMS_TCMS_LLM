@@ -3,11 +3,15 @@ import { useEffect, useMemo, useState } from "react";
 import { stepsApi, type Step } from "../api/courses";
 import { feedbackIndicesToShow } from "../lib/quizFeedback";
 import RichHtmlViewer from "./RichHtmlViewer";
+import { ru } from "../i18n/ru";
+import FreeAnswerForm from "./FreeAnswerForm";
+import MatchPlayer from "./MatchPlayer";
 import TestCaseForm from "./TestCaseForm";
+import UiPracticePlayer from "./UiPracticePlayer";
 
-type Props = { step: Step };
+type Props = { step: Step; onSaveNoteSelection?: (selectionText: string) => void };
 
-export default function StepPlayer({ step }: Props) {
+export default function StepPlayer({ step, onSaveNoteSelection }: Props) {
   const [selected, setSelected] = useState<number[]>([]);
   const [quizResult, setQuizResult] = useState<{ correct: boolean; score: number } | null>(null);
 
@@ -18,6 +22,7 @@ export default function StepPlayer({ step }: Props) {
 
   const conditionHtml = String(step.content.condition_html || "");
   const bodyHtml = String(step.content.body_html || "");
+  const freePromptHtml = String(step.content.prompt_html || "");
   const options = (step.content.options as string[]) || [];
   const multiple = Boolean(step.content.multiple);
   const correctIndices = (step.content.correct_indices as number[]) || [];
@@ -48,7 +53,7 @@ export default function StepPlayer({ step }: Props) {
   if (step.step_type === "text") {
     return (
       <Card title={step.title || "Теория"}>
-        <RichHtmlViewer html={bodyHtml} />
+        <RichHtmlViewer html={bodyHtml} enableNotes onSaveSelection={onSaveNoteSelection} />
       </Card>
     );
   }
@@ -103,6 +108,23 @@ export default function StepPlayer({ step }: Props) {
     );
   }
 
+  if (step.step_type === "match") {
+    return <MatchPlayer step={step} />;
+  }
+
+  if (step.step_type === "free_answer") {
+    return (
+      <Space direction="vertical" style={{ width: "100%" }} size="large">
+        {freePromptHtml && (
+          <Card title={ru.freeAnswer.promptTitle}>
+            <RichHtmlViewer html={freePromptHtml} />
+          </Card>
+        )}
+        <FreeAnswerForm stepId={step.id} />
+      </Space>
+    );
+  }
+
   if (step.step_type === "test_case") {
     return (
       <Space direction="vertical" style={{ width: "100%" }} size="large">
@@ -114,6 +136,10 @@ export default function StepPlayer({ step }: Props) {
         <TestCaseForm stepId={step.id} />
       </Space>
     );
+  }
+
+  if (step.step_type === "ui_practice") {
+    return <UiPracticePlayer step={step} />;
   }
 
   return <Card>Тип шага «{step.step_type}» пока не поддерживается в прохождении</Card>;

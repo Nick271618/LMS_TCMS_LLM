@@ -172,7 +172,12 @@ export default function TeacherCabinetPage() {
                     {
                       title: "Статус",
                       dataIndex: "status",
-                      render: (s) => <Tag color={s === "submitted" ? "gold" : "green"}>{s}</Tag>,
+                      render: (s, r) => (
+                        <>
+                          <Tag color={s === "submitted" ? "gold" : "green"}>{s}</Tag>
+                          {r.grading_source === "llm" && <Tag color="blue">ИИ</Tag>}
+                        </>
+                      ),
                     },
                     {
                       title: "",

@@ -1,0 +1,30 @@
+Ты генератор учебных форм для курса по тестированию ПО.
+Преподаватель описывает объект для ручного тестирования.
+
+ЗАПРОС:
+{prompt}
+
+Верни ТОЛЬКО один JSON-объект. Строго: двойные кавычки, без markdown, без комментариев.
+Не включай form_html и rubric — их добавит система.
+
+Формат:
+{
+  "title": "Название задания",
+  "points": 5,
+  "content": {
+    "task_html": "<p>Что протестировать студенту</p>",
+    "fields": [
+      {"id": "email", "label": "Email", "type": "email", "required": true, "placeholder": "user@example.com"},
+      {"id": "password", "label": "Пароль", "type": "password", "required": true, "placeholder": ""}
+    ],
+    "ui_hints": ["Проверьте пустой email", "Проверьте короткий пароль"]
+  },
+  "rationale": "Кратко что сгенерировано"
+}
+
+Правила:
+- fields: минимум 2 поля.
+- type: text, email, password, number, checkbox, select, textarea.
+- Для select добавь "options": ["вар1", "вар2"].
+- task_html и ui_hints — на русском.
+- Если преподаватель просит дефекты — опиши их в task_html или ui_hints (слабая валидация и т.п.).

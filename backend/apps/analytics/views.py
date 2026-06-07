@@ -106,14 +106,28 @@ class SubmissionDetailView(APIView):
         if not is_teacher and not is_owner:
             raise PermissionDenied
 
-        data = StepSubmissionSerializer(sub).data
+        data = StepSubmissionSerializer(
+            sub, context={"strip_llm_debug": not is_teacher}
+        ).data
         data["step_title"] = sub.step.title or sub.step.step_type
         data["step_type"] = sub.step.step_type
-        data["step_content"] = sub.step.content
+        content = sub.step.content or {}
+        if is_teacher:
+            data["step_content"] = content
+        else:
+            data["step_content"] = {
+                "condition_html": content.get("condition_html", ""),
+            }
         data["lesson_title"] = sub.step.lesson.title
         data["course_id"] = str(course.id)
         data["course_title"] = course.title
         payload = sub.payload if isinstance(sub.payload, dict) else {}
-        data["llm_score"] = payload.get("llm_score")
-        data["llm_feedback"] = payload.get("llm_feedback", "")
+        llm_grade = payload.get("llm_grade")
+        data["llm_grade"] = llm_grade
+        if isinstance(llm_grade, dict):
+            data["llm_score"] = llm_grade.get("total_percent")
+            data["llm_feedback"] = llm_grade.get("summary", "")
+        else:
+            data["llm_score"] = payload.get("llm_score")
+            data["llm_feedback"] = payload.get("llm_feedback", "")
         return Response(data)
